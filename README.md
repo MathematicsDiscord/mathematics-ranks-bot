@@ -25,7 +25,7 @@ The /tophelpers command presents a paginated leaderboard with all-time, monthly,
 
 ---
 
-### 🔧 Installation and Setup
+###  Installation and Setup
 
 Before you can begin setting up the bot, you'll need to make sure you have the following:
 1. Node.js (v16.9.0 or higher recommended)
