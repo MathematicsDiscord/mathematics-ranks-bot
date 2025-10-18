@@ -316,6 +316,8 @@ async function startBot() {
     });
 
     client.on('threadCreate', async (thread) => {
+        await new Promise(resolve => setTimeout(resolve, 1500)); 
+
         try {
             if (thread.parentId === process.env.HELP_SCHOOL_FORUM_ID || 
                 thread.parentId === process.env.HELP_UNIVERSITY_FORUM_ID) {
@@ -325,18 +327,17 @@ async function startBot() {
                     console.log(`Thread ${thread.id} in ${thread.parent.name} was created without an owner.`);
                     return;
                 }
-    
+
                 const welcomeEmbed = new EmbedBuilder()
-                    .setColor('#2ECC71')
+                    .setColor('#0096FF')
                     .setTitle('👋 Welcome to your Help Thread!')
-                    .setDescription(`Hey <@${ownerId}>,  Thanks for sharing your math problem with us.  While you wait for a Helper to help you, we want to share some vital information with you.`)
+                    .setDescription(`Hey <@${ownerId}>, Thanks for sharing your math problem with us. While you wait for a Helper to help you, we want to share some vital information with you.`)
                     .addFields(
-                        { name: '●', value: 'Please take a moment to read the [helpee guidelines](https://discord.com/channels/624314920158232616/1378764024094920856). This will make sure that your post follows the helpee rules of our community. ', inline: true },
-                        { name: '●', value: 'Please don\'t ping <@&775784618955505685>, <@&1283689826742440016>, <@&819616364188139550>, or <@&624327278137966593> for help because their job is to take care of the server\'s administrative tasks, not to answer queries directly. However, if you have a problem with how a Helper is acting, you can ping a Helper Moderator.  ', inline: true },
-                        { name: '●', value: 'It\'s always very useful if you can show us the work you\'ve done so far. This makes it easier for our Helpers to find mistakes and help you get to the right answer.  ', inline: true },
+                        { name: '\u200B', value: '● Please take a moment to read the [helpee guidelines](https://discord.com/channels/624314920158232616/1378764024094920856). This will make sure that your post follows the helpee rules of our community.', inline: false },
+                        { name: '\u200B', value: '● **Please don\'t ping** <@&775784618955505685>, <@&1283689826742440016>, <@&819616364188139550>, or <@&624327278137966593> for help because their job is to take care of the server\'s administrative tasks, not to answer queries directly. However, if you have a problem with how a Helper is acting, you can ping a Helper Moderator.', inline: false },
+                        { name: '\u200B', value: '● It\'s always very useful **if you can show us the work you\'ve done so far.** This makes it easier for our Helpers to find mistakes and help you get to the right answer.', inline: false }
                     )
-                    .setFooter({ text: 'Once you\'ve got your answer and you\'re all set, you can close this thread by typing +close, and then you can click the Thank buttons to show your Helper some appreciation.' })
-                    .setTimestamp();
+                    .setFooter({ text: 'Once you\'ve got your answer and you\'re all set, you can close this thread by typing +close, and then you can click the Thank buttons to show your Helper some appreciation.' });
 
                 const PatreonLink = new ActionRowBuilder().addComponents(
                     new ButtonBuilder()
@@ -344,12 +345,8 @@ async function startBot() {
                         .setStyle(ButtonStyle.Link)
                         .setURL('https://www.patreon.com/mathsdiscord')
                 );
-
-                const welcomeMessage = await thread.send({
-                    embeds: [welcomeEmbed],
-                    components: [PatreonLink],
-                });
     
+                const welcomeMessage = await thread.send({ embeds: [welcomeEmbed], components: [PatreonLink] });
                 await welcomeMessage.pin();
             }
         } catch (error) {
@@ -606,40 +603,68 @@ async function handleThankButton(interaction) {
 
 async function handleClosePost(interaction) {
     try {
-        const threadStartMessage = await interaction.channel.fetchStarterMessage();
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply({ ephemeral: true });
+        }
+
+        const threadChannel = interaction.channel;
+        if (!threadChannel || !threadChannel.isThread?.()) {
+            await interaction.editReply({ content: 'Unable to close this post because the thread could not be resolved.' });
+            return;
+        }
+
+        const threadStartMessage = await threadChannel.fetchStarterMessage();
         if (interaction.user.id !== threadStartMessage.author.id) {
-            await interaction.reply({ content: 'Only the user who created this post can close it.', ephemeral: true });
+            await interaction.editReply({ content: 'Only the user who created this post can close it.' });
             return;
         }
-        if (interaction.channel.archived) {
-            await interaction.user.send('This post is already closed and archived.');
-            await interaction.deferUpdate();
+
+        if (threadChannel.archived) {
+            try {
+                await interaction.user.send('This post is already closed and archived.');
+            } catch (dmError) {
+                console.error('Failed to send DM to user:', dmError);
+            }
+            await interaction.editReply({ content: 'This post is already closed and archived.' });
             return;
         }
+
         const closeEmbed = new EmbedBuilder()
             .setColor('#c90505')
             .setTitle('<:closed:1306624376028004362> | Help Request Closed')
             .setDescription('This post has been closed and archived. Thank you for using our help system!')
             .setTimestamp();
-        await interaction.reply({ embeds: [closeEmbed] });
-        await interaction.channel.setLocked(true);
-        await interaction.channel.setArchived(true);
 
+        await threadChannel.send({ embeds: [closeEmbed] });
+        await threadChannel.setLocked(true);
+        await threadChannel.setArchived(true);
+        await interaction.editReply({ content: 'The post has been closed and archived.' });
     } catch (error) {
         console.error('Error closing post:', error);
         if (error.code === 50083) {
             try {
                 await interaction.user.send('This post is already closed and archived.');
-                await interaction.deferUpdate();
             } catch (dmError) {
                 console.error('Failed to send DM to user:', dmError);
-                await interaction.reply({ content: 'This post is already closed and archived.', ephemeral: true });
+            }
+            try {
+                if (interaction.deferred) {
+                    await interaction.editReply({ content: 'This post is already closed and archived.' });
+                } else if (!interaction.replied) {
+                    await interaction.reply({ content: 'This post is already closed and archived.', ephemeral: true });
+                }
+            } catch (replyError) {
+                console.error('Failed to send error message to user:', replyError);
             }
         } else if (error.code === 10062) {
             console.error('Interaction expired or not found. Unable to respond to the user.');
         } else {
             try {
-                await interaction.reply({ content: 'An error occurred while closing the post. Please try again later or contact an administrator.', ephemeral: true });
+                if (interaction.deferred) {
+                    await interaction.editReply({ content: 'An error occurred while closing the post. Please try again later or contact an administrator.' });
+                } else if (!interaction.replied) {
+                    await interaction.reply({ content: 'An error occurred while closing the post. Please try again later or contact an administrator.', ephemeral: true });
+                }
             } catch (replyError) {
                 console.error('Failed to send error message to user:', replyError);
             }
@@ -729,11 +754,20 @@ async function checkOpenThreadsAndSendReminders(client) {
 }
 
 async function handleStillNeedHelpButton(interaction) {
+    try {
+        if (!interaction.deferred && !interaction.replied) {
+            await interaction.deferReply({ ephemeral: true });
+        }
+    } catch (deferError) {
+        console.error('Failed to defer interaction reply:', deferError);
+        return;
+    }
+
     console.log('Interaction customId:', interaction.customId);
     const [action, need, help, threadId] = interaction.customId.split('_');
     console.log('Parsed values:', { action, need, help, threadId });
     if (!threadId) {
-        await interaction.reply({ content: 'Error: Invalid thread ID. Please contact an administrator.', ephemeral: true });
+        await interaction.editReply({ content: 'Error: Invalid thread ID. Please contact an administrator.' });
         return;
     }
     let thread;
@@ -743,28 +777,40 @@ async function handleStillNeedHelpButton(interaction) {
         console.log('Successfully fetched thread:', thread.id);
     } catch (error) {
         console.error(`Error fetching thread ${threadId}:`, error);
-        await interaction.reply({ content: 'Sorry, this thread no longer exists or is inaccessible.', ephemeral: true });
+        await interaction.editReply({ content: 'Sorry, this thread no longer exists or is inaccessible.' });
         return;
     }
     if (!thread || !thread.isThread()) {
-        await interaction.reply({ content: 'Sorry, this thread no longer exists or is invalid.', ephemeral: true });
+        await interaction.editReply({ content: 'Sorry, this thread no longer exists or is invalid.' });
         return;
     }
-    const threadStarterMessage = await thread.fetchStarterMessage();
+
+    let threadStarterMessage;
+    try {
+        threadStarterMessage = await thread.fetchStarterMessage();
+    } catch (starterMessageError) {
+        console.error(`Failed to fetch starter message for thread ${threadId}:`, starterMessageError);
+        await interaction.editReply({ content: 'Unable to process this request because the thread starter could not be verified.' });
+        return;
+    }
+
     if (interaction.user.id !== threadStarterMessage.author.id) {
-        await interaction.reply({ content: 'Only the user who created this thread can use this button.', ephemeral: true });
+        await interaction.editReply({ content: 'Only the user who created this thread can use this button.' });
         return;
     }
+
     const message = await interaction.message.fetch();
     const disabledRow = ActionRowBuilder.from(message.components[0]).setComponents(
         ButtonBuilder.from(message.components[0].components[0]).setDisabled(true)
     );
     await interaction.message.edit({ components: [disabledRow] });
+
     const helperRole = interaction.guild.roles.cache.get(process.env.VOLUNTEER_HELPER_ROLE_ID);
     if (!helperRole) {
-        await interaction.reply({ content: 'Error: Helper role not found. Please contact a manager/dev admin.', ephemeral: true });
+        await interaction.editReply({ content: 'Error: Helper role not found. Please contact a manager/dev admin.' });
         return;
     }
+
     const helpers = new Set();
     let lastId;
     const fetchLimit = 100;
@@ -787,7 +833,7 @@ async function handleStillNeedHelpButton(interaction) {
     if (helpers.size > 0) {
         const helperMentions = Array.from(helpers).map(helper => `<@${helper.id}>`).join(' ');
         await thread.send(`${helperMentions} The user still needs help with this help request.`);
-        await interaction.deferUpdate();
+        await interaction.editReply({ content: 'Notified helpers who previously replied in this thread.' });
     } else {
         const closeButton = new ButtonBuilder()
             .setCustomId('close_post')
@@ -803,7 +849,7 @@ async function handleStillNeedHelpButton(interaction) {
             embeds: [embed],
             components: [row]
         });
-        await interaction.deferUpdate();
+        await interaction.editReply({ content: 'No helpers were found in the thread. Sent a reminder message instead.' });
     }
 }
 async function fetchWithRetry(fetchFunction, maxRetries, initialDelay = 1000) {
