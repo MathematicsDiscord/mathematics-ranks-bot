@@ -122,7 +122,7 @@ async function startBot() {
         try {
             
             if (message.author.bot) return;
-            const instagramRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram|kkinstagram)\.com\/[a-zA-Z0-9_\-\.\/\?=&%+]+/i;
+            const instagramRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram|kkinstagram)\.com(?:\/[a-zA-Z0-9_\-\.\/\?=&%+]+)?/i;
             const instaMatch = message.content.match(instagramRegex);
 
             if (instaMatch) {
