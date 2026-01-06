@@ -20,3 +20,4 @@ Dockerfile
 .dockerignore
 .gitattributes
 .prettierrc
+package-lock.json

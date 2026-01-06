@@ -19,8 +19,5 @@
     "mysql2": "^3.4.2",
     "node-cron": "^3.0.3",
     "node-fetch": "^2.7.0"
-  },
-  "overrides": {
-    "canvas": "2.9.3"
   }
 }
