@@ -122,15 +122,16 @@ async function startBot() {
         try {
             
             if (message.author.bot) return;
-            const instagramRegex = /https?:\/\/(?:www\.)?(?:instagram|kkinstagram)\.com\/[a-zA-Z0-9_\-\.\/\?=&%+]+/i;
+            const instagramRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram|kkinstagram)\.com\/[a-zA-Z0-9_\-\.\/\?=&%+]+/i;
             const instaMatch = message.content.match(instagramRegex);
 
             if (instaMatch) {
                 try {
                     if (message.member && message.member.isCommunicationDisabled()) {
-                        await message.member.disableCommunicationUntil(null, 'Removing timeout via Instagram Link Fixer');
+                        await message.member.disableCommunicationUntil(null, 'Removing timeout to repost Instagram link');
                     }
-                    const originalUrl = new URL(instaMatch[0]);
+                    const urlString = instaMatch[0].startsWith('http') ? instaMatch[0] : `https://${instaMatch[0]}`;
+                    const originalUrl = new URL(urlString);
                     let path = originalUrl.pathname;
                     if (path.startsWith('/reel/') || path.startsWith('/reels/')) {
                         path = path.replace(/^\/reels?\//, '/p/');
@@ -142,6 +143,8 @@ async function startBot() {
                     }
 
                     const newUrl = `https://vxinstagram.com${path}`;
+                    const newContent = message.content.replace(instaMatch[0], newUrl);
+                    
                     if (message.channel.permissionsFor(client.user).has(PermissionFlagsBits.ManageWebhooks)) {
                         const webhooks = await message.channel.fetchWebhooks();
                         let webhook = webhooks.find(wh => wh.owner.id === client.user.id);
@@ -154,7 +157,7 @@ async function startBot() {
                         }
 
                         await webhook.send({
-                            content: newUrl,
+                            content: newContent,
                             username: message.member ? message.member.displayName : message.author.username,
                             avatarURL: message.member ? message.member.displayAvatarURL({ dynamic: true }) : message.author.displayAvatarURL({ dynamic: true }),
                             allowedMentions: { parse: [] } 
