@@ -127,8 +127,18 @@ async function startBot() {
 
             if (instaMatch) {
                 try {
-                    if (message.member && message.member.isCommunicationDisabled()) {
-                        await message.member.disableCommunicationUntil(null, 'Removing timeout to repost Instagram link');
+                    if (message.guild) {
+                        const removeTimeout = async () => {
+                            try {
+                                const member = await message.guild.members.fetch({ user: message.author.id, force: true });
+                                if (member.isCommunicationDisabled()) {
+                                    await member.disableCommunicationUntil(null, 'Removing timeout to repost Instagram link');
+                                }
+                            } catch (err) {
+                            }
+                        };
+                        await removeTimeout();
+                        setTimeout(removeTimeout, 2500);
                     }
                     const urlString = instaMatch[0].startsWith('http') ? instaMatch[0] : `https://${instaMatch[0]}`;
                     const originalUrl = new URL(urlString);
