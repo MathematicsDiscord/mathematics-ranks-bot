@@ -17,6 +17,28 @@ function parseIdList(envVar) {
         .filter(Boolean);
 }
 
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Retry thread sends when the starter message is still processing (common with attachments).
+async function sendThreadMessageWithRetry(thread, messageOptions, { maxAttempts = 6, delayMs = 2000 } = {}) {
+    let lastError;
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        try {
+            return await thread.send(messageOptions);
+        } catch (error) {
+            lastError = error;
+            if (!error || error.code !== 40058) {
+                throw error;
+            }
+            await delay(delayMs);
+        }
+    }
+    console.warn(`Thread ${thread.id} not ready after ${maxAttempts} attempts. Skipping welcome message.`);
+    return null;
+}
+
 
 async function reportError(client, error, context = '') {
     const errorChannel = client.channels.cache.get(process.env.ERROR_CHANNEL_ID);
@@ -406,12 +428,14 @@ async function startBot() {
                         .setURL('https://www.patreon.com/mathsdiscord')
                 );
 
-                const welcomeMessage = await thread.send({
+                const welcomeMessage = await sendThreadMessageWithRetry(thread, {
                     embeds: [welcomeEmbed],
                     components: [PatreonLink],
                 });
     
-                await welcomeMessage.pin();
+                if (welcomeMessage) {
+                    await welcomeMessage.pin();
+                }
             }
         } catch (error) {
             console.error('Error in threadCreate event:', error);
