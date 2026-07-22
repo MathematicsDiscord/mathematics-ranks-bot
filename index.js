@@ -140,28 +140,16 @@ async function startBot() {
         });
     });
 
+    const instagramRegex = /(https?:\/\/)?(?:www\.)?(?:instagram)\.com(?:\/[a-zA-Z0-9_\-\.\/\?=&%+]+)?/i;
     client.on('messageCreate', async (message) => {
         try {
             
             if (message.author.bot) return;
-            const instagramRegex = /(?:https?:\/\/)?(?:www\.)?(?:instagram|kkinstagram)\.com(?:\/[a-zA-Z0-9_\-\.\/\?=&%+]+)?/i;
+            
             const instaMatch = message.content.match(instagramRegex);
 
             if (instaMatch) {
                 try {
-                    if (message.guild) {
-                        const removeTimeout = async () => {
-                            try {
-                                const member = await message.guild.members.fetch({ user: message.author.id, force: true });
-                                if (member.isCommunicationDisabled()) {
-                                    await member.disableCommunicationUntil(null, 'Removing timeout to repost Instagram link');
-                                }
-                            } catch (err) {
-                            }
-                        };
-                        await removeTimeout();
-                        setTimeout(removeTimeout, 2500);
-                    }
                     const urlString = instaMatch[0].startsWith('http') ? instaMatch[0] : `https://${instaMatch[0]}`;
                     const originalUrl = new URL(urlString);
                     let path = originalUrl.pathname;
@@ -174,7 +162,7 @@ async function startBot() {
                         path += `${imgIndex}/`;
                     }
 
-                    const newUrl = `https://vxinstagram.com${path}`;
+                    const newUrl = `https://kkinstagram.com${path}`;
                     const newContent = message.content.replace(instaMatch[0], newUrl);
                     
                     if (message.channel.permissionsFor(client.user).has(PermissionFlagsBits.ManageWebhooks)) {
@@ -192,7 +180,7 @@ async function startBot() {
                             content: newContent,
                             username: message.member ? message.member.displayName : message.author.username,
                             avatarURL: message.member ? message.member.displayAvatarURL({ dynamic: true }) : message.author.displayAvatarURL({ dynamic: true }),
-                            allowedMentions: { parse: [] } 
+                            allowedMentions: { parse: [] }
                         });
                         if (message.deletable) {
                             await message.delete();
